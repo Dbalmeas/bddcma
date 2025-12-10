@@ -27,7 +27,7 @@ interface ChartConfig {
   title: string
   data: any[]
   xKey?: string
-  yKey?: string
+  yKey?: string | string[]  // Support pour barres groupées
   dataKey?: string
   rationale?: string
 }
@@ -36,18 +36,18 @@ interface DynamicChartProps {
   config: ChartConfig
 }
 
-// CMA CGM Color Palette
+// CMA CGM Official Color Palette (optimisé mode sombre)
 const COLORS = [
-  '#00458C', // CMA CGM Primary Blue (light mode)
-  '#002D59', // CMA CGM Primary Blue (dark mode)
-  '#EF4035', // CMA CGM Red (light mode)
-  '#EF4035', // CMA CGM Red (dark mode)
-  '#0EA5E9', // sky-500
-  '#06B6D4', // cyan-500
-  '#6366F1', // indigo-500
-  '#60A5FA', // blue-400
-  '#38BDF8', // sky-400
-  '#22D3EE', // cyan-400
+  '#4a6fa5', // Bleu CMA CGM clair (lisible en sombre)
+  '#FF4444', // Rouge CMA CGM vif
+  '#6a8fc5', // Bleu plus clair
+  '#ff6666', // Rouge clair
+  '#8aafdd', // Bleu très clair
+  '#ff8888', // Rouge très clair
+  '#3a5f95', // Bleu moyen
+  '#cc3333', // Rouge foncé
+  '#5a7fb5', // Bleu lumineux
+  '#ee5555', // Rouge lumineux
 ]
 
 const tooltipStyle = {
@@ -157,11 +157,11 @@ export default function DynamicChart({ config }: DynamicChartProps) {
         <LineChart data={data}>
           <defs>
             <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.3}/>
-              <stop offset="100%" stopColor="#3B82F6" stopOpacity={0}/>
+              <stop offset="0%" stopColor="#4a6fa5" stopOpacity={0.3}/>
+              <stop offset="100%" stopColor="#4a6fa5" stopOpacity={0}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(59, 130, 246, 0.1)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(100, 140, 200, 0.15)" vertical={false} />
           <XAxis
             dataKey={xKey}
             stroke="rgba(255, 255, 255, 0.2)"
@@ -179,14 +179,14 @@ export default function DynamicChart({ config }: DynamicChartProps) {
               tickFormatter={(value) => value.toLocaleString('fr-FR')}
           />
             <Tooltip content={<CustomTooltip />} />
-            <Brush dataKey={xKey} height={30} stroke="#3B82F6" />
+            <Brush dataKey={xKey} height={30} stroke="#4a6fa5" />
           <Line
             type="monotone"
             dataKey={yKey}
-            stroke="var(--primary)"
+            stroke="#4a6fa5"
             strokeWidth={2.5}
-            dot={{ fill: 'var(--primary)', strokeWidth: 2, stroke: 'var(--primary)', r: 4 }}
-            activeDot={{ r: 6, fill: '#93C5FD', stroke: '#3B82F6' }}
+            dot={{ fill: '#4a6fa5', strokeWidth: 2, stroke: '#4a6fa5', r: 4 }}
+            activeDot={{ r: 6, fill: '#FF4444', stroke: '#4a6fa5' }}
           />
         </LineChart>
       </ResponsiveContainer>
@@ -194,8 +194,12 @@ export default function DynamicChart({ config }: DynamicChartProps) {
     )
   }
 
-  // Bar Chart avec interactivité améliorée
+  // Bar Chart avec interactivité améliorée (supporte barres groupées)
   if (type === 'bar' && xKey && yKey) {
+    const isMultipleBars = Array.isArray(yKey)
+    const barKeys = isMultipleBars ? yKey : [yKey]
+    const barColors = ['#4a6fa5', '#FF4444', '#6a8fc5', '#ff6666', '#8aafdd']
+    
     return (
       <div ref={chartRef} className="space-y-2">
         <div className="flex items-center justify-between">
@@ -216,11 +220,15 @@ export default function DynamicChart({ config }: DynamicChartProps) {
         <BarChart data={data}>
           <defs>
             <linearGradient id="barGradientDynamic" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0%" stopColor="#1E40AF" stopOpacity={1}/>
-              <stop offset="100%" stopColor="#3B82F6" stopOpacity={1}/>
+              <stop offset="0%" stopColor="#3a5f95" stopOpacity={1}/>
+              <stop offset="100%" stopColor="#6a8fc5" stopOpacity={1}/>
+            </linearGradient>
+            <linearGradient id="barGradientRed" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor="#cc3333" stopOpacity={1}/>
+              <stop offset="100%" stopColor="#FF4444" stopOpacity={1}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(59, 130, 246, 0.1)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(100, 140, 200, 0.15)" vertical={false} />
           <XAxis
             dataKey={xKey}
             stroke="rgba(255, 255, 255, 0.2)"
@@ -238,12 +246,16 @@ export default function DynamicChart({ config }: DynamicChartProps) {
               tickFormatter={(value) => value.toLocaleString('fr-FR')}
           />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(59, 130, 246, 0.08)' }} />
-          <Bar 
-            dataKey={yKey} 
-            fill="url(#barGradientDynamic)" 
-            radius={[4, 4, 0, 0]} 
-              animationDuration={500}
-          />
+            {isMultipleBars && <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)' }} />}
+            {barKeys.map((key, index) => (
+              <Bar 
+                key={key}
+                dataKey={key} 
+                fill={barColors[index % barColors.length]}
+                radius={[4, 4, 0, 0]} 
+                animationDuration={500}
+              />
+            ))}
         </BarChart>
       </ResponsiveContainer>
       </div>

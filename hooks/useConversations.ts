@@ -1,16 +1,16 @@
 /**
  * Hook React pour gérer les conversations
- * Utilise conversation-manager pour localStorage
+ * Utilise Supabase pour stocker les conversations
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import {
   type Conversation,
   type Message,
-  loadConversations,
-  saveConversation,
-  deleteConversation as deleteConv,
-  loadConversation,
+  loadConversations as loadConversationsFromDB,
+  saveConversation as saveConversationToDB,
+  deleteConversation as deleteConvFromDB,
+  loadConversation as loadConversationFromDB,
   generateTitle,
   loadFromShareLink,
 } from '@/lib/conversation-manager'
@@ -18,26 +18,33 @@ import {
 export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   // Charger les conversations au montage
   useEffect(() => {
-    refreshConversations()
+    const init = async () => {
+      setIsLoading(true)
+      await refreshConversations()
 
-    // Charger depuis share link si présent
-    const shared = loadFromShareLink()
-    if (shared) {
-      // Ajouter la conversation partagée aux conversations
-      saveConversation(shared)
-      setCurrentConversationId(shared.id)
-      refreshConversations()
+      // Charger depuis share link si présent
+      const shared = loadFromShareLink()
+      if (shared) {
+        // Ajouter la conversation partagée aux conversations
+        await saveConversationToDB(shared)
+        setCurrentConversationId(shared.id)
+        await refreshConversations()
 
-      // Nettoyer l'URL
-      window.history.replaceState({}, '', window.location.pathname)
+        // Nettoyer l'URL
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+      setIsLoading(false)
     }
+
+    init()
   }, [])
 
-  const refreshConversations = useCallback(() => {
-    const loaded = loadConversations()
+  const refreshConversations = useCallback(async () => {
+    const loaded = await loadConversationsFromDB()
     setConversations(loaded)
   }, [])
 
@@ -53,16 +60,16 @@ export function useConversations() {
       updatedAt: new Date(),
     }
 
-    saveConversation(newConv)
+    // Sauvegarder en async (fire and forget)
+    saveConversationToDB(newConv).then(() => refreshConversations())
     setCurrentConversationId(id)
-    refreshConversations()
 
     return id
   }, [refreshConversations])
 
   const updateConversation = useCallback(
-    (id: string, messages: Message[]) => {
-      const conv = loadConversation(id)
+    async (id: string, messages: Message[]) => {
+      const conv = await loadConversationFromDB(id)
       if (!conv) return
 
       // Mettre à jour le titre avec le premier message user si nécessaire
@@ -81,26 +88,26 @@ export function useConversations() {
         updatedAt: new Date(),
       }
 
-      saveConversation(updated)
-      refreshConversations()
+      await saveConversationToDB(updated)
+      await refreshConversations()
     },
     [refreshConversations]
   )
 
   const deleteConversation = useCallback(
-    (id: string) => {
-      deleteConv(id)
+    async (id: string) => {
+      await deleteConvFromDB(id)
       if (currentConversationId === id) {
         setCurrentConversationId(null)
       }
-      refreshConversations()
+      await refreshConversations()
     },
     [currentConversationId, refreshConversations]
   )
 
   const loadConversationById = useCallback(
-    (id: string) => {
-      const conv = loadConversation(id)
+    async (id: string) => {
+      const conv = await loadConversationFromDB(id)
       if (conv) {
         setCurrentConversationId(id)
       }
@@ -118,5 +125,6 @@ export function useConversations() {
     deleteConversation,
     loadConversationById,
     refreshConversations,
+    isLoading,
   }
 }

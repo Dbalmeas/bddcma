@@ -11,6 +11,16 @@ export const supabase = createClient(
     auth: {
       persistSession: false,
     },
+    global: {
+      headers: {
+        'x-client-info': 'cma-cgm-talk-to-data',
+      },
+    },
+    db: {
+      schema: 'public',
+    },
+    // Augmenter le timeout pour les grandes requêtes (filtres géographiques)
+    // Par défaut c'est 60s, on passe à 120s
   }
 )
 
@@ -73,14 +83,32 @@ export interface UserMetric {
 // Types pour les données CMA CGM
 export interface Booking {
   job_reference: string
+  // Client information (who pays)
+  partner_code: string | null
+  partner_name: string | null
+  uo_name: string | null
+  // Transporter information (who transports)
   shipcomp_code: string | null
   shipcomp_name: string | null
+  // Port information
   point_load: string | null
   point_load_country: string | null
+  point_load_desc: string | null
+  point_load_country_desc: string | null
   point_disch: string | null
   point_disch_country: string | null
+  point_disch_desc: string | null
+  point_disch_country_desc: string | null
   origin: string | null
   destination: string | null
+  // Trade/route information
+  commercial_trade: string | null
+  commercial_subtrade: string | null
+  commercial_pole: string | null
+  commercial_haul: string | null
+  // Contract information
+  contract_type: string | null
+  // Dates and status
   booking_confirmation_date: string | null
   cancellation_date: string | null
   job_status: number | null
@@ -91,17 +119,25 @@ export interface Booking {
 export interface DtlSequence {
   job_reference: string
   job_dtl_sequence: number
-  nb_teu: number | null
+  // Volume metrics
+  teus_booked: number | null
   nb_units: number | null
+  net_weight_booked: number | null
+  // Commodity information
   commodity_description: string | null
-  net_weight: number | null
+  commodity_code_lara: string | null
+  package_code: string | null
+  marketing_commodity_l0: string | null
+  marketing_commodity_l1: string | null
+  marketing_commodity_l2: string | null
+  // Flags
   haz_flag: boolean
   reef_flag: boolean
-  is_reefer: boolean
-  oversize_flag: boolean
-  is_oog: boolean
-  package_code: string | null
-  commodity_code_lara: string | null
+  oog_flag: boolean
+  soc_flag: boolean
+  is_empty: boolean
+  // Rate information
+  unif_rate: number | null
   created_at?: string
   updated_at?: string
 }

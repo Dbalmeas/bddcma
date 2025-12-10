@@ -22,3 +22,6 @@ console.log('3. Ou copier-coller le contenu dans l\'éditeur SQL de Supabase');
 console.log(`\n📁 Fichier: ${sqlFile}`);
 console.log(`\n💡 Pour exécuter via MCP, utilisez mcp_supabase_execute_sql avec les requêtes par batch`);
 
+
+
+

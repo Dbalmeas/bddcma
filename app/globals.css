@@ -43,14 +43,14 @@
 .dark {
   --background: #001A33;
   --foreground: #FFFFFF;
-  --primary: #002D59;
+  --primary: #4A90D9;
   --primary-foreground: #ffffff;
-  --secondary: #FF6F00;
+  --secondary: #FF8C33;
   --secondary-foreground: #ffffff;
   --border: #003366;
   --muted: #002244;
-  --muted-foreground: #CCCCCC;
-  --accent: #002D59;
+  --muted-foreground: #B0C4DE;
+  --accent: #5BA0E8;
   --accent-foreground: #ffffff;
   --destructive: #FF6F00;
   --destructive-foreground: #ffffff;
@@ -90,13 +90,107 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.5s ease-in-out, color 0.5s ease-in-out;
 }
 
-/* Logo CMA CGM - Transparence forcée */
+/* Smooth transitions pour tous les éléments lors du changement de thème */
+* {
+  transition: background-color 0.3s ease-in-out, 
+              border-color 0.3s ease-in-out, 
+              color 0.3s ease-in-out,
+              opacity 0.3s ease-in-out,
+              transform 0.2s ease-in-out,
+              box-shadow 0.2s ease-in-out,
+              filter 0.2s ease-in-out;
+}
+
+/* Pas de transition pour les éléments qui ne doivent pas en avoir */
+*[class*="transition-none"],
+.no-transition {
+  transition: none !important;
+}
+
+/* Transitions fluides pour les éléments interactifs */
+button, a, [role="button"], [tabindex="0"] {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Transitions pour les cartes et contenus */
+[data-slot="card"],
+.card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Transitions pour les inputs et textareas */
+input, textarea, select {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Transitions pour les overlays et modals */
+[data-slot="sheet"],
+[data-slot="dialog"],
+[data-slot="popover"] {
+  transition: opacity 0.3s ease-in-out, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Scroll smooth */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Transitions pour les icônes */
+svg {
+  transition: transform 0.2s ease-in-out, fill 0.2s ease-in-out, stroke 0.2s ease-in-out;
+}
+
+/* Animations personnalisées pour les boutons */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* Animation pour les boutons de navigation */
+.group:hover .group-hover\:animate-float {
+  animation: float 2s ease-in-out infinite;
+}
+
+/* Logo CMA CGM - Dimensions fixes et transparence forcée */
+/* Le conteneur s'adapte dynamiquement via les styles inline */
+.cma-logo-container {
+  background: transparent !important;
+}
+
+.cma-logo-image,
 img[alt="CMA CGM"],
 img[src*="cma-logo"] {
   background: transparent !important;
   mix-blend-mode: normal;
+  object-fit: contain !important;
+  object-position: center !important;
 }
 
 /* Container du logo */
@@ -141,3 +235,111 @@ header a[href="/"] img {
 .text-theme-muted {
   color: var(--muted-foreground);
 }
+
+/* Safe area support for mobile devices */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-inset {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Touch manipulation for better mobile responsiveness */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent overscroll bounce on iOS */
+.overscroll-contain {
+  overscroll-behavior: contain;
+}
+
+/* Mobile-first breakpoint utilities */
+@media (max-width: 639px) {
+  /* Extra small screens */
+  .xs\:inline {
+    display: inline !important;
+  }
+  
+  .xs\:hidden {
+    display: none !important;
+  }
+}
+
+/* Improved focus states for accessibility */
+@media (hover: hover) {
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Exception for inline elements */
+  button.inline-size,
+  [role="button"].inline-size,
+  a.inline-size {
+    min-height: auto;
+    min-width: auto;
+  }
+}
+
+/* Dynamic viewport height for mobile browsers */
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+/* Improved scrollbar for desktop */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--muted);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+}
+
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+  }
+}
+

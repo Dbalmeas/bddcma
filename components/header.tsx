@@ -17,10 +17,10 @@ export const Header = () => {
   const isDark = currentTheme === "dark";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-transparent border-b border-border/30">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-b border-border/50 shadow-sm">
       <div className="flex items-center justify-between px-4 md:px-6 lg:px-8 py-3 md:py-4">
-        {/* Logo à gauche */}
-        <Link href="/" className="flex items-center" style={{ backgroundColor: 'transparent' }}>
+        {/* Logo à gauche - reste fixe en haut */}
+        <Link href="/" className="flex items-center transition-opacity hover:opacity-80" style={{ backgroundColor: 'transparent' }}>
           <Logo className={isDark ? "w-[240px] md:w-[280px]" : "w-[130px] md:w-[160px]"} />
         </Link>
 

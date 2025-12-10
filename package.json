@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
     "lint": "next lint",
     "start": "next start",
     "ingest": "tsx scripts/ingest-data.ts",
@@ -13,9 +13,11 @@
     "ingest:sample:all": "tsx scripts/ingest-all-sampled.ts",
     "ingest:albert": "tsx scripts/ingest-albert-school-csv.ts",
     "ingest:albert:sql": "tsx scripts/ingest-albert-mcp.ts",
-    "setup-and-ingest": "tsx scripts/setup-and-ingest.ts"
+    "setup-and-ingest": "tsx scripts/setup-and-ingest.ts",
+    "test:supabase": "tsx scripts/test-supabase-connection.ts"
   },
   "dependencies": {
+    "@codesandbox/sandpack-react": "^2.20.0",
     "@eslint/eslintrc": "latest",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
@@ -61,7 +63,10 @@
     "expo-file-system": "latest",
     "expo-gl": "latest",
     "geist": "^1.3.1",
+    "html2canvas": "^1.4.1",
     "input-otp": "1.4.1",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
     "leaflet": "^1.9.4",
     "leva": "latest",
     "lucide-react": "^0.454.0",

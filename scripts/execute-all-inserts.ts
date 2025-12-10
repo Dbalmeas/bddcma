@@ -28,3 +28,6 @@ console.log(`\n📁 Fichier: ${sqlFile}`);
 console.log(`\n⚠️  Note: Exécuter 400 requêtes via MCP peut prendre du temps.`);
 console.log('   Il est recommandé d\'utiliser l\'éditeur SQL de Supabase pour une exécution plus rapide.');
 
+
+
+

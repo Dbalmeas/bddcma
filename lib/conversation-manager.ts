@@ -1,7 +1,9 @@
 /**
  * Gestionnaire de conversations
- * Sauvegarde et charge les conversations depuis localStorage
+ * Utilise Supabase pour stocker les conversations et messages
  */
+
+import { supabase } from './supabase'
 
 export interface Message {
   id: string
@@ -26,51 +28,86 @@ export interface Conversation {
   updatedAt: Date
 }
 
-const STORAGE_KEY = 'everdian_conversations'
-const MAX_CONVERSATIONS = 10 // Limite réduite pour éviter les erreurs de quota localStorage
-const MAX_MESSAGES_PER_CONVERSATION = 20 // Limite de messages par conversation
+// Types Supabase pour la base de données
+interface DBConversation {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+interface DBMessage {
+  id: string
+  conversation_id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+  validation: any | null
+  statistics: any | null
+  charts: any[] | null
+  created_at: string
+}
 
 /**
- * Nettoie un message en retirant les grandes données pour économiser l'espace localStorage
+ * Convertit une conversation DB en conversation locale
  */
-function stripLargeData(message: Message): Message {
+function dbToConversation(dbConv: DBConversation, dbMessages: DBMessage[]): Conversation {
   return {
-    id: message.id,
-    role: message.role,
-    content: message.content,
-    timestamp: message.timestamp,
-    validation: message.validation ? {
-      valid: message.validation.valid,
-      confidence: message.validation.confidence,
-      errors: message.validation.errors.slice(0, 3), // Garder seulement 3 erreurs
-      warnings: message.validation.warnings.slice(0, 3), // Garder seulement 3 warnings
-    } : undefined,
-    // Retirer rawData, charts, statistics, situationalReport, narrativeAnalysis, patternAnalysis, externalContext
-    // Ces données peuvent être très volumineuses
+    id: dbConv.id,
+    title: dbConv.title,
+    createdAt: new Date(dbConv.created_at),
+    updatedAt: new Date(dbConv.updated_at),
+    messages: dbMessages.map(msg => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      timestamp: new Date(msg.timestamp),
+      validation: msg.validation || undefined,
+      statistics: msg.statistics || undefined,
+      charts: msg.charts || undefined,
+    })),
   }
 }
 
 /**
- * Charge toutes les conversations depuis localStorage
+ * Charge toutes les conversations depuis Supabase
  */
-export function loadConversations(): Conversation[] {
-  if (typeof window === 'undefined') return []
-
+export async function loadConversations(): Promise<Conversation[]> {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) return []
+    const { data: conversations, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(50)
 
-    const conversations = JSON.parse(stored)
-    // Convertir les dates string en objets Date
-    return conversations.map((conv: any) => ({
-      ...conv,
-      createdAt: new Date(conv.createdAt),
-      updatedAt: new Date(conv.updatedAt),
-      messages: conv.messages.map((msg: any) => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp),
-      })),
-    }))
+    if (error) {
+      console.error('Error loading conversations:', error)
+      return []
+    }
+
+    if (!conversations || conversations.length === 0) {
+      return []
+    }
+
+    // Charger les messages pour chaque conversation
+    const conversationsWithMessages = await Promise.all(
+      conversations.map(async (conv) => {
+        const { data: messages, error: msgError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation_id', conv.id)
+          .order('timestamp', { ascending: true })
+
+        if (msgError) {
+          console.error('Error loading messages for conversation:', conv.id, msgError)
+          return dbToConversation(conv, [])
+        }
+
+        return dbToConversation(conv, messages || [])
+      })
+    )
+
+    return conversationsWithMessages
   } catch (error) {
     console.error('Error loading conversations:', error)
     return []
@@ -78,82 +115,133 @@ export function loadConversations(): Conversation[] {
 }
 
 /**
- * Sauvegarde une conversation
+ * Charge une conversation spécifique depuis Supabase
  */
-export function saveConversation(conversation: Conversation): void {
-  if (typeof window === 'undefined') return
-
+export async function loadConversation(id: string): Promise<Conversation | null> {
+  if (!id) return null
+  
   try {
-    const conversations = loadConversations()
+    const { data: conv, error } = await supabase
+      .from('conversations')
+      .select('*')
+      .eq('id', id)
+      .single()
 
-    // Nettoyer les messages pour retirer les grandes données
-    const cleanedConversation = {
-      ...conversation,
-      messages: conversation.messages
-        .slice(-MAX_MESSAGES_PER_CONVERSATION) // Garder seulement les N derniers messages
-        .map(stripLargeData),
-      updatedAt: new Date(),
+    // Si pas de résultat ou erreur PGRST116 (no rows), retourner null silencieusement
+    if (!conv || (error && error.code === 'PGRST116')) {
+      return null
+    }
+    
+    if (error) {
+      console.error('Error loading conversation:', error)
+      return null
     }
 
-    // Chercher si la conversation existe déjà
-    const index = conversations.findIndex(c => c.id === conversation.id)
+    const { data: messages, error: msgError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', id)
+      .order('timestamp', { ascending: true })
 
-    if (index >= 0) {
-      // Mettre à jour
-      conversations[index] = cleanedConversation
-    } else {
-      // Ajouter nouvelle conversation
-      conversations.unshift(cleanedConversation)
+    if (msgError) {
+      console.error('Error loading messages:', msgError)
+      return dbToConversation(conv, [])
     }
 
-    // Limiter le nombre de conversations
-    const limited = conversations.slice(0, MAX_CONVERSATIONS)
+    return dbToConversation(conv, messages || [])
+  } catch (error) {
+    // Ne pas logger les erreurs pour les conversations non trouvées
+    if (error && typeof error === 'object' && Object.keys(error).length > 0) {
+      console.error('Error loading conversation:', error)
+    }
+    return null
+  }
+}
 
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(limited))
-    } catch (quotaError: any) {
-      // Si erreur de quota, essayer avec encore moins de conversations
-      if (quotaError.name === 'QuotaExceededError' || quotaError.code === 22) {
-        console.warn('localStorage quota exceeded, reducing to 5 conversations')
-        const veryLimited = conversations.slice(0, 5)
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(veryLimited))
-        } catch (secondError) {
-          // Si ça ne marche toujours pas, garder seulement 1 conversation
-          console.warn('Still quota exceeded, keeping only 1 conversation')
-          localStorage.setItem(STORAGE_KEY, JSON.stringify([cleanedConversation]))
-        }
-      } else {
-        throw quotaError
+/**
+ * Sauvegarde ou met à jour une conversation
+ */
+export async function saveConversation(conversation: Conversation): Promise<void> {
+  try {
+    // Upsert la conversation
+    const { error: convError } = await supabase
+      .from('conversations')
+      .upsert({
+        id: conversation.id,
+        title: conversation.title,
+        created_at: conversation.createdAt.toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+
+    if (convError) {
+      console.error('Error saving conversation:', convError)
+      return
+    }
+
+    // Récupérer les messages existants pour cette conversation
+    const { data: existingMessages } = await supabase
+      .from('messages')
+      .select('id')
+      .eq('conversation_id', conversation.id)
+
+    const existingIds = new Set((existingMessages || []).map(m => m.id))
+
+    // Filtrer les nouveaux messages seulement
+    const newMessages = conversation.messages.filter(msg => !existingIds.has(msg.id))
+
+    if (newMessages.length > 0) {
+      // Insérer les nouveaux messages
+      const { error: msgError } = await supabase
+        .from('messages')
+        .insert(
+          newMessages.map(msg => ({
+            id: msg.id,
+            conversation_id: conversation.id,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp,
+            validation: msg.validation || null,
+            statistics: msg.statistics || null,
+            charts: msg.charts || null,
+          }))
+        )
+
+      if (msgError) {
+        console.error('Error saving messages:', msgError)
       }
     }
   } catch (error) {
     console.error('Error saving conversation:', error)
-    // Ne pas bloquer l'application, juste logger l'erreur
   }
 }
 
 /**
- * Supprime une conversation
+ * Supprime une conversation et ses messages
  */
-export function deleteConversation(id: string): void {
-  if (typeof window === 'undefined') return
-
+export async function deleteConversation(id: string): Promise<void> {
   try {
-    const conversations = loadConversations()
-    const filtered = conversations.filter(c => c.id !== id)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
+    // Supprimer d'abord les messages (contrainte de clé étrangère)
+    const { error: msgError } = await supabase
+      .from('messages')
+      .delete()
+      .eq('conversation_id', id)
+
+    if (msgError) {
+      console.error('Error deleting messages:', msgError)
+    }
+
+    // Puis supprimer la conversation
+    const { error: convError } = await supabase
+      .from('conversations')
+      .delete()
+      .eq('id', id)
+
+    if (convError) {
+      console.error('Error deleting conversation:', convError)
+    }
   } catch (error) {
     console.error('Error deleting conversation:', error)
   }
-}
-
-/**
- * Charge une conversation spécifique
- */
-export function loadConversation(id: string): Conversation | null {
-  const conversations = loadConversations()
-  return conversations.find(c => c.id === id) || null
 }
 
 /**
@@ -177,13 +265,19 @@ export function exportToJSON(conversation: Conversation): string {
  */
 export function exportToCSV(conversation: Conversation): string {
   const headers = ['Role', 'Content', 'Timestamp', 'Valid', 'Confidence']
-  const rows = conversation.messages.map(msg => [
-    msg.role,
-    `"${msg.content.replace(/"/g, '""')}"`, // Escape quotes
-    msg.timestamp.toISOString(),
-    msg.validation?.valid ? 'true' : 'false',
-    msg.validation?.confidence.toString() || 'N/A',
-  ])
+  const rows = conversation.messages.map(msg => {
+    const timestamp = msg.timestamp instanceof Date && !isNaN(msg.timestamp.getTime())
+      ? msg.timestamp.toISOString()
+      : new Date().toISOString()
+
+    return [
+      msg.role,
+      `"${msg.content.replace(/"/g, '""')}"`,
+      timestamp,
+      msg.validation?.valid ? 'true' : 'false',
+      msg.validation?.confidence.toString() || 'N/A',
+    ]
+  })
 
   return [
     headers.join(','),
@@ -243,11 +337,14 @@ export function loadFromShareLink(): Conversation | null {
     return {
       id: 'shared-' + Date.now(),
       title: data.title,
-      messages: data.messages.map((m: any) => ({
-        ...m,
-        id: Date.now() + Math.random(),
-        timestamp: new Date(m.timestamp),
-      })),
+      messages: data.messages.map((m: any) => {
+        const timestamp = new Date(m.timestamp)
+        return {
+          ...m,
+          id: Date.now() + Math.random(),
+          timestamp: isNaN(timestamp.getTime()) ? new Date() : timestamp,
+        }
+      }),
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -258,14 +355,15 @@ export function loadFromShareLink(): Conversation | null {
 }
 
 /**
- * Nettoie toutes les conversations stockées (utile si localStorage est plein)
+ * Supprime toutes les conversations (admin only)
  */
-export function clearAllConversations(): void {
-  if (typeof window === 'undefined') return
-
+export async function clearAllConversations(): Promise<void> {
   try {
-    localStorage.removeItem(STORAGE_KEY)
-    console.log('All conversations cleared from localStorage')
+    // Supprimer tous les messages
+    await supabase.from('messages').delete().neq('id', '')
+    // Supprimer toutes les conversations
+    await supabase.from('conversations').delete().neq('id', '')
+    console.log('All conversations cleared from Supabase')
   } catch (error) {
     console.error('Error clearing conversations:', error)
   }

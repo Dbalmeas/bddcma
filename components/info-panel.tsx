@@ -8,16 +8,18 @@ import { Badge } from "./ui/badge"
 import { Share2, Link2, Download } from "lucide-react"
 
 const stats = [
-  { label: "Total Events", value: "3.2M" },
-  { label: "Countries", value: "195" },
-  { label: "Sources", value: "15K+" },
+  { label: "Bookings", value: "~20K" },
+  { label: "Clients", value: "~500" },
+  { label: "Ports", value: "~150" },
 ]
 
 const exampleQueries = [
-  "Show recent events in [location]",
-  "Analyze [event type] patterns",
-  "Compare events across regions",
-  "Export data for [time period]",
+  "Quel est le volume TEU de Renault depuis le début d'année ?",
+  "Part Spot vs Long Terme sur la trade Asie-Europe",
+  "Top 10 clients par volume dernier trimestre",
+  "Clients avec volume en baisse > 20% vs N-1",
+  "Nombre de reefers au départ Shanghai en novembre",
+  "Répartition des marchandises dangereuses par destination",
 ]
 
 export function InfoPanel() {

@@ -49,6 +49,21 @@ interface CSVRow {
   IS_OOG: string;
   PACKAGE_CODE: string;
   COMMODITY_CODE_LARA: string;
+  CONTRACT_TYPE: string;
+  UNIF_RATE: string;
+  COMMERCIAL_TRADE: string;
+  COMMERCIAL_SUBTRADE: string;
+  COMMERCIAL_POLE: string;
+  COMMERCIAL_HAUL: string;
+  COMMERCIAL_GROUP_LINE: string;
+  VOYAGE_REF_JH: string;
+  POINT_FROM: string;
+  POINT_TO: string;
+  SOC_FLAG: string;
+  IS_EMPTY: string;
+  MARKETING_COMMODITY_L0: string;
+  MARKETING_COMMODITY_L1: string;
+  MARKETING_COMMODITY_L2: string;
 }
 
 // Fonction pour convertir les valeurs booléennes
@@ -127,6 +142,16 @@ CREATE TABLE IF NOT EXISTS bookings (
   booking_confirmation_date DATE,
   cancellation_date DATE,
   job_status INTEGER,
+  contract_type TEXT,
+  unif_rate NUMERIC,
+  commercial_trade TEXT,
+  commercial_subtrade TEXT,
+  commercial_pole TEXT,
+  commercial_haul TEXT,
+  commercial_group_line TEXT,
+  voyage_ref_jh TEXT,
+  point_from TEXT,
+  point_to TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -146,6 +171,11 @@ CREATE TABLE IF NOT EXISTS dtl_sequences (
   is_oog BOOLEAN DEFAULT FALSE,
   package_code TEXT,
   commodity_code_lara TEXT,
+  soc_flag BOOLEAN DEFAULT FALSE,
+  is_empty BOOLEAN DEFAULT FALSE,
+  marketing_commodity_l0 TEXT,
+  marketing_commodity_l1 TEXT,
+  marketing_commodity_l2 TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (job_reference, job_dtl_sequence),
@@ -224,6 +254,16 @@ async function ingestCSV(filePath: string) {
         booking_confirmation_date: parseDate(row.BOOKING_CONFIRMATION_DATE),
         cancellation_date: parseDate(row.CANCELLATION_DATE),
         job_status: parseNumeric(row.JOB_STATUS) || null,
+        contract_type: row.CONTRACT_TYPE?.trim() || null,
+        unif_rate: parseNumeric(row.UNIF_RATE),
+        commercial_trade: row.COMMERCIAL_TRADE?.trim() || null,
+        commercial_subtrade: row.COMMERCIAL_SUBTRADE?.trim() || null,
+        commercial_pole: row.COMMERCIAL_POLE?.trim() || null,
+        commercial_haul: row.COMMERCIAL_HAUL?.trim() || null,
+        commercial_group_line: row.COMMERCIAL_GROUP_LINE?.trim() || null,
+        voyage_ref_jh: row.VOYAGE_REF_JH?.trim() || null,
+        point_from: row.POINT_FROM?.trim() || null,
+        point_to: row.POINT_TO?.trim() || null,
       });
     }
 
@@ -244,6 +284,11 @@ async function ingestCSV(filePath: string) {
         is_oog: parseBoolean(row.IS_OOG),
         package_code: row.PACKAGE_CODE?.trim() || null,
         commodity_code_lara: row.COMMODITY_CODE_LARA?.trim() || null,
+        soc_flag: parseBoolean(row.SOC_FLAG),
+        is_empty: parseBoolean(row.IS_EMPTY),
+        marketing_commodity_l0: row.MARKETING_COMMODITY_L0?.trim() || null,
+        marketing_commodity_l1: row.MARKETING_COMMODITY_L1?.trim() || null,
+        marketing_commodity_l2: row.MARKETING_COMMODITY_L2?.trim() || null,
       });
     }
 

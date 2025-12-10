@@ -227,3 +227,6 @@ generateSQLInserts(csvPath).catch((error) => {
   process.exit(1);
 });
 
+
+
+

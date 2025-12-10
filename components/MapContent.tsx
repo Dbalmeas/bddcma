@@ -161,7 +161,7 @@ export default function MapContent({ markers, totalEvents }: MapContentProps) {
       })
 
       // Add hover effect
-      circle.on("mouseover", function () {
+      circle.on("mouseover", function (this: L.CircleMarker) {
         this.setStyle({
           fillOpacity: 0.8,
           weight: 2.5,
@@ -169,7 +169,7 @@ export default function MapContent({ markers, totalEvents }: MapContentProps) {
         })
       })
 
-      circle.on("mouseout", function () {
+      circle.on("mouseout", function (this: L.CircleMarker) {
         this.setStyle({
           fillOpacity: 0.4 + intensity * 0.4,
           weight: 1.5,

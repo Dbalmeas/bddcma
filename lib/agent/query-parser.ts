@@ -8,12 +8,13 @@ import { getMistralLLM } from './mistral-llm'
 
 // Entités métier shipping
 export const SHIPPING_ENTITIES = {
-  clients: ['client', 'customer', 'shipper', 'consignee', 'shipcomp', 'shipcomp_code', 'shipcomp_name'],
+  clients: ['client', 'customer', 'partner', 'partner_code', 'partner_name', 'uo_name'],
+  shippers: ['shipper', 'transporter', 'carrier', 'shipcomp', 'shipcomp_code', 'shipcomp_name'],
   ports: ['port', 'pol', 'pod', 'point_load', 'point_disch', 'origin', 'destination', 'port of loading', 'port of discharge'],
   trades: ['trade', 'route', 'lane', 'asia-europe', 'europe-asia', 'transpacific', 'transatlantic'],
-  metrics: ['teu', 'nb_teu', 'volume', 'units', 'nb_units', 'weight', 'net_weight'],
+  metrics: ['teu', 'teus_booked', 'volume', 'units', 'nb_units', 'weight', 'net_weight_booked'],
   commodities: ['commodity', 'cargo', 'goods', 'commodity_description', 'commodity_code'],
-  flags: ['haz', 'haz_flag', 'hazardous', 'reef', 'reef_flag', 'reefer', 'is_reefer', 'oog', 'oversize', 'oversize_flag', 'is_oog'],
+  flags: ['haz', 'haz_flag', 'hazardous', 'reef', 'reef_flag', 'reefer', 'oog', 'oog_flag', 'out of gauge'],
   status: ['status', 'job_status', 'cancelled', 'active', 'confirmed'],
 }
 
@@ -27,16 +28,17 @@ export const SHIPPING_SYNONYMS: Record<string, string[]> = {
   pod: ['pod', 'port of discharge', 'port de déchargement', 'destination', 'destinations', 'point_disch'],
   cancelled: ['cancelled', 'canceled', 'annulé', 'annulés', 'cancellation'],
   trade: ['trade', 'trades', 'route', 'routes', 'lane', 'lanes', 'ligne', 'lignes'],
+  synergy: ['synergie', 'synergies', 'synergy', 'match back', 'matchback', 'import-export', 'import export', 'réutilisation', 'repositionnement'],
 }
 
 export interface ParsedQuery {
-  intent: 'report' | 'table' | 'graph' | 'search' | 'export' | 'analysis' | 'clarification'
+  intent: 'report' | 'table' | 'graph' | 'search' | 'export' | 'analysis' | 'clarification' | 'synergy'
   filters: {
     dateRange?: {
       start: string // ISO date
       end: string
     }
-    client?: string | string[] // shipcomp_code ou shipcomp_name
+    client?: string | string[] // partner_code ou partner_name
     pol?: string | string[] // Port of Loading
     pod?: string | string[] // Port of Discharge
     trade?: string // Trade route
@@ -91,44 +93,75 @@ export async function parseQuery(
 AVAILABLE DATA SCHEMA:
 - bookings table (level 1):
   * job_reference (PRIMARY KEY)
-  * shipcomp_code, shipcomp_name (client information)
+  * partner_code, partner_name, uo_name (CLIENT information - who pays)
+  * shipcomp_code, shipcomp_name (TRANSPORTER information - who transports)
   * point_load, point_load_country (POL - Port of Loading)
   * point_disch, point_disch_country (POD - Port of Discharge)
   * origin, destination
   * booking_confirmation_date, cancellation_date
-  * job_status (INTEGER: 0=Active, 1=Cancelled, etc.)
-  
+  * job_status (INTEGER: 0=Active, 9=Cancelled, etc.)
+  * contract_type (Spot vs Long Term)
+
 - dtl_sequences table (level 2, 1-N relationship with bookings):
   * job_reference (FK to bookings)
   * job_dtl_sequence
-  * nb_teu (TEU volume - main metric)
+  * teus_booked (TEU volume - main metric)
   * nb_units (number of units)
   * commodity_description, commodity_code_lara
-  * net_weight
-  * haz_flag, reef_flag, is_reefer, oversize_flag, is_oog (boolean flags)
+  * net_weight_booked
+  * haz_flag, reef_flag, oog_flag (boolean flags)
 
 CURRENT DATE: ${new Date().toISOString().split('T')[0]}
+
+AVAILABLE DATA PERIOD:
+- Main dataset: January 2020 to June 2020 (6 months, ~1.065M bookings)
+- Historical data: Full year 2019 (~123K bookings)
+- Total period: 2019-01-01 to 2020-06-30 (18 months)
+- NOTE: Very limited data outside this period (2017-2018: <200 bookings, 2020-07 onwards: <500 bookings)
+
+GEOGRAPHIC CONTEXT:
+- Main origin region: ASIA (China 59%, South Korea, Vietnam, Malaysia, Singapore)
+- Main destination: Middle East (UAE 100%), South Asia (India, Pakistan), East Africa (Egypt)
+- Top origin ports: CNNGB (Ningbo), CNSHK (Shekou), CNTAO (Qingdao), CNSHA (Shanghai), CNXMN (Xiamen)
+- Top destination ports: UAE ports, INPAV (Pipavav), INNSA (Nhava Sheva), EGAIS (Ain Sukhna)
+- Primary trade lanes: Asia-Middle East, Asia-India, Asia-East Africa
 
 ${contextSummary}
 
 USER QUERY: "${userQuery}"
 
 SHIPPING JARGON TO RECOGNIZE:
-- Clients: shipcomp_code, shipcomp_name, client, customer, shipper
+- Clients: partner_code, partner_name, uo_name, client, customer (who pays for the shipping)
+- Transporters: shipcomp_code, shipcomp_name, carrier, shipper (who does the transport - e.g., CMA CGM, APL)
 - Ports: POL (Port of Loading/point_load), POD (Port of Discharge/point_disch)
-- Trades: Asia-Europe, Europe-Asia, Transpacific, Transatlantic
-- Metrics: TEU (nb_teu), units (nb_units), weight (net_weight)
+- Metrics: TEU (teus_booked), units (nb_units), weight (net_weight_booked)
 - Abbreviations: TEU, OOG (Out of Gauge), POL, POD
-- Status: Cancelled bookings should be EXCLUDED by default for volume analysis
+- Status: Cancelled bookings (job_status=9) should be EXCLUDED by default for volume analysis
 
-TEMPORAL REFERENCES:
-- Relative: "last quarter", "dernier trimestre", "this month", "ce mois-ci", "last week", "semaine dernière"
-- Absolute: "January 2024", "janvier 2024", "Q1 2024"
-- Comparative: "compared to last year", "par rapport à l'année dernière"
+IMPORTANT - Geographic Filtering Rules:
+- If query mentions a COUNTRY (e.g., "depuis la Chine", "from China", "China", "Chine"): 
+  → Extract pol: "China" OR "CN" (will filter on point_load_country)
+- If query mentions a SPECIFIC PORT (e.g., "depuis Ningbo", "from Shanghai"):
+  → Extract pol: "Ningbo" OR "CNNGB" (will filter on point_load)
+- If query mentions "Chinese ports" or "ports chinois" (plural, generic):
+  → Extract pol: "China" OR "CN" (to get ALL Chinese ports via country filter)
+  
+Examples:
+- "volume depuis la Chine" → pol: "China" (country filter)
+- "volume depuis Ningbo" → pol: "Ningbo" (port filter)
+- "top ports chinois" → pol: "China" (country filter to get all, then aggregate by port)
+
+TEMPORAL REFERENCES (adapt to available data 2019 + Jan-Jun 2020):
+- "last year", "année dernière" → 2019
+- "this year", "cette année" → 2020 (Jan-Jun only)
+- "Q1 2020", "Q2 2020" → use appropriate quarter in 2020
+- "first half 2020", "premier semestre" → Jan-Jun 2020
+- Comparative: "compared to last year" → compare 2020 vs 2019
+- "recent", "récent" → focus on Q1-Q2 2020 (most data is here)
 
 Extract the following information and return ONLY valid JSON (no markdown, no explanation):
 {
-  "intent": "report" | "table" | "graph" | "search" | "export" | "analysis" | "clarification",
+  "intent": "report" | "table" | "graph" | "search" | "export" | "analysis" | "clarification" | "synergy",
   "filters": {
     "dateRange": { "start": "YYYY-MM-DD", "end": "YYYY-MM-DD" } or null,
     "client": "client name or code" or ["array of clients"] or null,
@@ -163,21 +196,22 @@ RULES:
    - Be tolerant of language mixing (common in shipping industry)
 
 2. TEMPORAL REFERENCES:
-   - "today" / "aujourd'hui": use today's date
-   - "yesterday" / "hier": use yesterday's date
-   - "last week" / "semaine dernière": last 7 days
-   - "this month" / "ce mois-ci": current month
-   - "last quarter" / "dernier trimestre": previous quarter
-   - "Q1 2024": January 1 - March 31, 2024
-   - Relative dates: calculate from CURRENT DATE
+   - IMPORTANT: Data is only available for 2019 and Jan-Jun 2020
+   - If user asks for dates outside this range, set dateRange to the available period
+   - "last year", "année dernière": use 2019-01-01 to 2019-12-31
+   - "this year", "cette année": use 2020-01-01 to 2020-06-30
+   - "Q1 2020": January 1 - March 31, 2020
+   - "first half 2020", "premier semestre 2020": 2020-01-01 to 2020-06-30
+   - If no date specified: use full available range (2019-01-01 to 2020-06-30)
+   - Relative dates: map to available period, not current date
 
 3. DEFAULT FILTERS:
-   - For volume/analysis queries: ALWAYS exclude Cancelled bookings (job_status != 1)
+   - For volume/analysis queries: ALWAYS exclude Cancelled bookings (job_status != 9)
    - Status filter default: ["Active"] (exclude Cancelled)
 
 4. AGGREGATION LEVEL:
-   - TEU volume (nb_teu) is at dtl_sequence level
-   - When aggregating by client: group bookings by shipcomp_code/name, sum nb_teu from dtl_sequences
+   - TEU volume (teus_booked) is at dtl_sequence level
+   - When aggregating by client: group bookings by partner_code/name, sum teus_booked from dtl_sequences
    - When aggregating by port: group by point_load or point_disch
    - metric: "teu" for volume analysis, "count" for booking counts
 
@@ -193,14 +227,27 @@ RULES:
 
 7. ENTITY RECOGNITION:
    - Recognize shipping jargon: TEU, POL, POD, OOG, trade routes
-   - Map synonyms: "client" → shipcomp_name, "port" → point_load/point_disch
+   - Map synonyms: "client" → partner_name, "transporter" → shipcomp_name, "port" → point_load/point_disch
    - Handle abbreviations and full terms interchangeably
+   - IMPORTANT: "client" refers to partner_* (who pays), NOT shipcomp_* (who transports)
 
 8. OUTPUT FORMAT:
    - "rapport" / "report" → outputFormat: "text"
    - "tableau" / "table" → outputFormat: "table"
    - "graphique" / "chart" / "graph" → outputFormat: "chart"
    - Volume queries → prefer "chart" with aggregation
+
+9. SYNERGY / MATCH BACK DETECTION (IMPORTANT):
+   - If user asks about "synergies", "synergy", "match back", "import-export", "réutilisation conteneurs", 
+     "repositionnement", "même zone", "mêmes zones", "opportunités logistiques" → intent: "synergy"
+   - Keywords: synergie, synergy, match back, import export, import-export, flux import, flux export,
+     réutilisation, repositionnement, container reuse, équilibre import/export, balance
+   - Examples of synergy queries:
+     * "Quels clients peuvent créer des synergies logistiques import-export sur les mêmes zones ?"
+     * "Opportunités de match back entre clients"
+     * "Réutilisation des conteneurs par zone"
+     * "Which clients can share containers on same routes?"
+   - For synergy queries: set intent to "synergy" and aggregation.groupBy to null (special handling)
 
 Return ONLY the JSON object, nothing else.`
 

@@ -89,3 +89,6 @@ CREATE INDEX IF NOT EXISTS idx_dtl_sequences_commodity ON dtl_sequences(commodit
 
 setupTables().catch(console.error);
 
+
+
+

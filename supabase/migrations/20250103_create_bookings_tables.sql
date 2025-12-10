@@ -57,3 +57,5 @@ CREATE INDEX IF NOT EXISTS idx_dtl_sequences_commodity ON dtl_sequences(commodit
 COMMENT ON TABLE bookings IS 'Informations générales de réservation (niveau 1)';
 COMMENT ON TABLE dtl_sequences IS 'Détails des conteneurs pour chaque booking (niveau 2, relation 1-N)';
 
+
+
